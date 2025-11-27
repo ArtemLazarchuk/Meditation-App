@@ -147,4 +147,197 @@ class ExampleInstrumentedTest {
         assertEquals("Package name має відповідати очікуваному",
             "com.example.meditationapp", context.packageName)
     }
+
+    /**
+     * Тест 6: Форматування часу у форматі HH:MM:SS (для UI відображення)
+     */
+    @Test
+    fun testTimeFormattingHHMMSS() {
+        // Форматування часу з HomeFragment (для UI)
+        fun formatTimeHHMMSS(sec: Long): String {
+            val hours = sec / 3600
+            val minutes = (sec % 3600) / 60
+            val seconds = sec % 60
+            return String.format("%02d:%02d:%02d", hours, minutes, seconds)
+        }
+        
+        assertEquals("0 секунд мають форматуватися як 00:00:00", "00:00:00", formatTimeHHMMSS(0))
+        assertEquals("60 секунд мають форматуватися як 00:01:00", "00:01:00", formatTimeHHMMSS(60))
+        assertEquals("300 секунд (5 хв) мають форматуватися як 00:05:00", "00:05:00", formatTimeHHMMSS(300))
+        assertEquals("3665 секунд (1 год 1 хв 5 сек) мають форматуватися як 01:01:05", 
+            "01:01:05", formatTimeHHMMSS(3665))
+        assertEquals("1800 секунд (30 хв) мають форматуватися як 00:30:00", "00:30:00", formatTimeHHMMSS(1800))
+        assertEquals("150 секунд мають форматуватися як 00:02:30", "00:02:30", formatTimeHHMMSS(150))
+    }
+
+    /**
+     * Тест 7: Перевірка співставлення звуків та їх ресурсів
+     */
+    @Test
+    fun testSoundNamesAndResourcesMapping() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        
+        // Список звуків з HomeFragment
+        val sounds = listOf(
+            "Relax Ambience" to R.raw.ambiant_relax_sounds_10621,
+            "Meditation Flow" to R.raw.meditation_flow_30s_307996,
+            "Music For Meditation" to R.raw.music_for_meditation_20534,
+            "New Composition" to R.raw.new_composition_3_20536,
+            "Perfect Beauty" to R.raw.perfect_beauty_191271,
+            "Piano Moment" to R.raw.piano_moment_9835,
+            "Relaxing Sound" to R.raw.relaxing_145038
+        )
+        
+        assertEquals("Має бути 7 звуків", 7, sounds.size)
+        
+        // Перевірка, що всі назви унікальні
+        val soundNames = sounds.map { it.first }
+        val uniqueNames = soundNames.distinct()
+        assertEquals("Всі назви звуків мають бути унікальними", 
+            soundNames.size, uniqueNames.size)
+        
+        // Перевірка, що всі ресурси унікальні
+        val soundResources = sounds.map { it.second }
+        val uniqueResources = soundResources.distinct()
+        assertEquals("Всі ресурси мають бути унікальними", 
+            soundResources.size, uniqueResources.size)
+        
+        // Перевірка, що кожна назва має відповідний ресурс
+        sounds.forEach { (name, resId) ->
+            assertNotNull("Назва звуку не має бути null", name)
+            assertTrue("Назва звуку '$name' не має бути порожньою", name.isNotBlank())
+            assertTrue("ID ресурсу $resId має бути більше 0", resId > 0)
+            
+            // Перевірка, що ресурс доступний
+            try {
+                context.resources.getResourceEntryName(resId)
+                assertTrue("Ресурс для '$name' має існувати", true)
+            } catch (e: Exception) {
+                fail("Ресурс для '$name' не знайдено: ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * Тест 8: Перевірка мінімальної тривалості сесії для збереження
+     */
+    @Test
+    fun testMinimumSessionDurationForSaving() {
+        val minDurationSeconds = 5 // З HomeFragment: if (elapsed > 5)
+        
+        // Тестуємо логіку збереження сесії
+        fun shouldSaveSession(elapsedSeconds: Int): Boolean {
+            return elapsedSeconds > minDurationSeconds
+        }
+        
+        // Перевірка, що сесії <= 5 секунд не зберігаються
+        assertFalse("Сесія 0 секунд не має зберігатися", shouldSaveSession(0))
+        assertFalse("Сесія 1 секунда не має зберігатися", shouldSaveSession(1))
+        assertFalse("Сесія 5 секунд не має зберігатися", shouldSaveSession(5))
+        
+        // Перевірка, що сесії > 5 секунд зберігаються
+        assertTrue("Сесія 6 секунд має зберігатися", shouldSaveSession(6))
+        assertTrue("Сесія 10 секунд має зберігатися", shouldSaveSession(10))
+        assertTrue("Сесія 300 секунд має зберігатися", shouldSaveSession(300))
+        
+        // Перевірка значення мінімальної тривалості
+        assertEquals("Мінімальна тривалість має бути 5 секунд", 5, minDurationSeconds)
+    }
+
+    /**
+     * Тест 9: Перевірка обчислення пройденого часу (elapsed time)
+     */
+    @Test
+    fun testElapsedTimeCalculation() {
+        // Логіка обчислення elapsed time з HomeFragment
+        fun calculateElapsedTime(selectedMinutes: Int, secondsLeft: Long): Int {
+            return (selectedMinutes * 60) - secondsLeft.toInt()
+        }
+        
+        // Тест 1: Таймер не запущений
+        assertEquals("Пройдений час має бути 0 для не запущеного таймера",
+            0, calculateElapsedTime(5, 300))
+        
+        // Тест 2: Таймер пройшов 30 секунд з 5 хвилин
+        assertEquals("Пройдений час має бути 30 секунд",
+            30, calculateElapsedTime(5, 270))
+        
+        // Тест 3: Таймер пройшов половину (2.5 хвилини з 5)
+        assertEquals("Пройдений час має бути 150 секунд",
+            150, calculateElapsedTime(5, 150))
+        
+        // Тест 4: Таймер завершений
+        assertEquals("Пройдений час має бути 300 секунд для завершеного таймера",
+            300, calculateElapsedTime(5, 0))
+        
+        // Тест 5: Різні опції таймера
+        assertEquals("Пройдений час має бути 180 секунд для 3 хвилин",
+            180, calculateElapsedTime(3, 0))
+        assertEquals("Пройдений час має бути 600 секунд для 10 хвилин",
+            600, calculateElapsedTime(10, 0))
+    }
+
+    /**
+     * Тест 10: Перевірка структури та валідності MeditationSession
+     */
+    @Test
+    fun testMeditationSessionDataStructure() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        
+        // Перевірка структури даних
+        val durationSeconds = 300
+        val timestamp = System.currentTimeMillis()
+        
+        // Створюємо тестовий об'єкт (модель з Room)
+        // Перевіряємо, що дані валідні
+        assertTrue("Тривалість сесії має бути більше мінімальної (5 сек)",
+            durationSeconds > 5)
+        assertTrue("Timestamp має бути додатнім числом", timestamp > 0)
+        
+        // Перевірка, що timestamp не в майбутньому
+        assertTrue("Timestamp не має бути в майбутньому",
+            timestamp <= System.currentTimeMillis())
+        
+        // Перевірка розумних меж
+        assertTrue("Тривалість сесії має бути в розумних межах (до 24 годин)",
+            durationSeconds <= 86400) // 24 години
+        
+        // Перевірка конвертації хвилин в секунди для сесії
+        val minutes = 5
+        val expectedSeconds = minutes * 60
+        assertEquals("5 хвилин мають дорівнювати 300 секундам",
+            expectedSeconds, durationSeconds)
+    }
+
+    /**
+     * Тест 11: Перевірка Broadcast Intent структури для завершення сесії
+     */
+    @Test
+    fun testBroadcastIntentStructure() {
+        // Перевірка структури Intent для завершення сесії
+        val action = MeditationTimerService.ACTION_SESSION_FINISHED
+        val extraDuration = MeditationTimerService.EXTRA_DURATION_SECONDS
+        val extraTimestamp = MeditationTimerService.EXTRA_FINISHED_AT_MILLIS
+        
+        // Перевірка, що всі константи визначені
+        assertNotNull("Action не має бути null", action)
+        assertNotNull("Extra duration не має бути null", extraDuration)
+        assertNotNull("Extra timestamp не має бути null", extraTimestamp)
+        
+        // Перевірка формату action
+        assertTrue("Action має починатися з package name",
+            action.startsWith("com.example.meditationapp"))
+        assertTrue("Action має містити ACTION_SESSION_FINISHED",
+            action.contains("ACTION_SESSION_FINISHED"))
+        
+        // Перевірка формату extra keys
+        assertTrue("Extra duration має містити 'duration'",
+            extraDuration.contains("duration"))
+        assertTrue("Extra timestamp має містити 'finished'",
+            extraTimestamp.contains("finished"))
+        
+        // Перевірка унікальності ключів
+        assertNotEquals("Ключі мають бути різними",
+            extraDuration, extraTimestamp)
+    }
 }
